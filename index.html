@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#ffffff"><title>Pick & Answer — Live Game</title>
+<style>
+:root{--pink:#e91e63;--purple:#8e44ad;--ink:#172033;--muted:#667085;--line:#e7e9ef}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:var(--ink);background:#fff}
+header{text-align:center;padding:22px 14px;background:#fff4f8;border-bottom:1px solid #f4d8e2}h1{margin:0;font-size:clamp(26px,7vw,38px)}h1 span{display:block;color:var(--pink);font-style:italic}.sub{font-weight:700;margin:8px 0}.muted{color:var(--muted);font-size:13px}
+main{max-width:720px;margin:auto;padding:14px}.panel{border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row input{flex:1;min-width:120px;border:1px solid #d7dbe4;border-radius:10px;padding:11px;font:inherit}
+button{border:0;border-radius:10px;padding:11px 13px;font:inherit;font-weight:750;cursor:pointer;background:var(--pink);color:white}.secondary{background:#f0f2f6;color:#263247}.player{background:white;color:#9d174d;border:1px solid #efbfd0}.player.active{background:var(--pink);color:white}
+#roomInfo{overflow-wrap:anywhere}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.num{background:#fff;color:#253047;border:1px solid #e1e4eb;min-height:45px;padding:7px}.num.used{background:#f0f1f4;color:#999;text-decoration:line-through}.num.current{outline:3px solid #f5a3c0}.q{font-size:18px;font-weight:650;line-height:1.45;min-height:80px;display:flex;align-items:center}.chat{height:220px;overflow:auto;background:#fafbfc;border-radius:12px;padding:10px;margin:10px 0}.msg{max-width:90%;padding:9px 11px;margin:7px 0;border-radius:12px;background:#eeeef4;overflow-wrap:anywhere}.msg.me{margin-left:auto;background:#ffe0eb}.msg b{display:block;font-size:12px;margin-bottom:3px}.msg .muted{font-size:11px}.chatform{display:flex;gap:7px}.chatform input{flex:1;min-width:0;border:1px solid #d7dbe4;border-radius:10px;padding:10px;font:inherit}
+.notice{background:#fff8e8;border:1px solid #f3dfad;border-radius:12px;padding:12px;font-size:13px;line-height:1.5}.hidden{display:none!important}
+@media(min-width:560px){.grid{grid-template-columns:repeat(8,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<header><h1>PICK & ANSWER <span>The Chemistry Test ❤️‍🔥</span></h1><div class="sub">55 Flirty, Romantic & Deep Questions</div><div class="muted">Live two-phone game · Shared questions and chat</div></header>
+<main>
+<div class="notice" id="setupNotice"><b>Before playing:</b> the owner must publish this page and configure the database rules using the included README. Use a unique, hard-to-guess room code and share it privately. Never share service-account keys.</div>
+<section class="panel">
+<h3 style="margin:0 0 10px">Join the same game</h3>
+<div class="row"><input id="name" placeholder="Your name / nickname" maxlength="24"><input id="room" placeholder="Room code (e.g. STARLET55)" maxlength="30"><button id="joinBtn">Join room</button></div>
+<p class="muted">Both of you must use the same room code, but different nicknames.</p>
+<div id="roomInfo" class="muted">Not connected to a room yet.</div>
+</section>
+<section id="game" class="hidden">
+<div class="panel">
+<div class="row" style="justify-content:space-between;align-items:center"><b id="turnLabel">Current turn</b><button class="secondary" id="passBtn">Pass turn ↔</button></div>
+<h3 id="qtitle">Choose a number 👇</h3><div class="q" id="qtext">Tap a number below to reveal a question.</div>
+<div class="row"><button id="markBtn">Mark answered ✓</button><button class="secondary" id="copyBtn">Copy question</button></div>
+</div>
+<div class="panel"><h3 style="margin-top:0">Choose a question</h3><div class="grid" id="grid"></div><p class="muted">Grey numbers have been answered. Everyone in the room sees updates.</p></div>
+<div class="panel"><h3 style="margin-top:0">Live chat 💬</h3><div id="chat" class="chat"></div><form id="chatForm" class="chatform"><input id="message" placeholder="Type your answer or reply…" maxlength="1000" autocomplete="off"><button>Send</button></form><p class="muted">Messages appear on both phones while both are online.</p></div>
+</section>
+</main>
+<script type="module">
+/*
+  SETUP: Replace the placeholder firebaseConfig below with your project's Web App config.
+  Enable Realtime Database and set database rules for your intended use before sharing.
+*/
+const firebaseConfig = {
+  apiKey: "AIzaSyCdwan3j-QaXE1c-Pr_M_Pa_wc3MD1lDMc",
+  authDomain: "pick-and-answer.firebaseapp.com",
+  databaseURL: "https://pick-and-answer-default-rtdb.firebaseio.com",
+  projectId: "pick-and-answer",
+  storageBucket: "pick-and-answer.firebasestorage.app",
+  messagingSenderId: "961269206875",
+  appId: "1:961269206875:web:0f0e33dff484675651547e",
+  measurementId: "G-6JK0V75L8H"
+};
+const questions = [
+"What's one thing about me that you find attractive but would struggle to admit to my face?",
+"If we were alone together for an entire evening, how would you want us to spend it?",
+"What's something you've imagined us doing together but haven't told me yet? 👀",
+"If I looked into your eyes and asked what you really wanted from me, what would you say?",
+"What's one compliment you want me to give you but would never ask for?",
+"Between my voice, my eyes, my smile, and my personality, which one gets to you the most?",
+"If I challenged you to make me blush in one sentence, what would you say? 😏",
+"What's something I could do that would instantly give you butterflies?",
+"If someone asked you what makes our connection different, what would you tell them?",
+"What's one question you've wanted to ask me but have been too shy to ask?",
+"Would you rather be with someone who understands you completely or someone who loves you intensely?",
+"What's something you could forgive in a relationship that most people wouldn't?",
+"If your feelings for someone started fading, would you fight to restore them or leave?",
+"What's more painful to you: being cheated on or discovering that someone never truly loved you?",
+"If I became emotionally distant, would you confront me or match my energy?",
+"Could you genuinely love someone who wasn't financially stable but had ambition and a good heart?",
+"What's one thing that could make you walk away from someone you deeply love?",
+"If you had to choose between protecting my feelings and telling me a painful truth, which would you choose?",
+"Do you believe two people can love each other deeply and still be wrong for each other?",
+"What's something you would need from me to feel completely secure in our relationship?",
+"If I sat beside you and held your gaze without saying anything, what would you do?",
+"What's your idea of a perfectly romantic moment with someone you're attracted to?",
+"Would you rather receive a sweet voice note at midnight or an unexpected romantic message in the morning?",
+"If you could replay one moment between us, which moment would you choose?",
+"What kind of flirting works on you even when you try not to show it?",
+"If I told you, “There's something about you that makes it difficult to behave normally,” what would you ask me next? 😂",
+"What's more powerful to you: emotional connection, eye contact, or playful teasing?",
+"If we had one evening together with no phones or distractions, what would you want us to talk about?",
+"What's something innocent that can feel surprisingly romantic when it comes from the right person?",
+"If I challenged you to write me a message that would leave me smiling at my phone, what would it say?",
+"What's the first thing you noticed about me, and what do you notice now?",
+"Have you ever acted like you didn't care about someone when you actually cared a lot?",
+"What's one thing about your personality that you worry might make relationships difficult?",
+"If I could hear your unfiltered thoughts about me for ten seconds, would you be nervous?",
+"What's something you wish someone would notice about you without you having to explain it?",
+"If you could ask me one question and receive a completely honest answer, what would you ask?",
+"What's the boldest romantic thing you've ever wanted to do but lacked the courage to try?",
+"Have you ever felt jealous without having the right to express it?",
+"What's one thing you would want me to understand about the way you love?",
+"If we stopped talking tomorrow, what would you miss most about our conversations?",
+"Describe me in three words. You can't use beautiful, cute, or nice.",
+"Tell me something you genuinely like about me that you think I haven't noticed.",
+"Choose one: ask me a question you've been afraid to ask, or let me ask you one you've been avoiding.",
+"If you had to give me a nickname based on our chemistry, what would it be?",
+"Send a message describing your honest first impression of me.",
+"Tell me one thing you would like us to do together someday, and explain why.",
+"Finish this sentence without overthinking: “If you knew what I was thinking about you right now, you would…”",
+"Give me a compliment so specific that I know you actually pay attention to me.",
+"Let me choose one question for you to answer honestly, provided you're comfortable answering it.",
+"Tell me something you've wanted to say to me but keep finding excuses not to say.",
+"If you had to choose between being my favourite person and being the person who understands me best, which would you choose?",
+"What's one thing about our connection that you think could become dangerous for your feelings?",
+"If I asked you tonight whether you genuinely have feelings for me, would your answer surprise me?",
+"Imagine I told you that I sometimes wonder what it would be like if we became more than we are now. What's the first thing you'd want to know?",
+"Complete this honestly: “If I ever gave you a real chance to get closer to me, the first thing I'd want you to know is…” 👀❤️‍🔥"
+];
+const $=id=>document.getElementById(id);
+let db, ref, onValue, set, push, serverTimestamp, roomPath, state={selected:0,answered:{},turn:1,messages:[]},myName="",joined=false;
+function section(n){return n<=10?1:n<=20?2:n<=30?3:n<=40?4:n<=50?5:6}
+function render(){
+ $('turnLabel').textContent='Current turn: '+(state.turn===1?'Player 1':'Player 2');
+ $('qtitle').textContent=state.selected?'Question '+state.selected+' 👀':'Choose a number 👇';
+ $('qtext').textContent=state.selected?questions[state.selected-1]:'Tap a number below to reveal a question.';
+ $('markBtn').disabled=!state.selected||!!state.answered[state.selected];
+ $('grid').innerHTML='';
+ questions.forEach((q,i)=>{let n=i+1,b=document.createElement('button');b.className='num'+(state.answered[n]?' used':'')+(state.selected===n?' current':'');b.textContent=n;b.style.borderTop='4px solid '+(['#e91e63','#8e44ad','#ff526b','#4169e1','#f39c12','#bd45c8'][section(n)-1]);b.onclick=()=>update({selected:n});$('grid').appendChild(b)});
+ $('chat').innerHTML='';
+ (state.messages||[]).slice(-100).forEach(m=>{let d=document.createElement('div');d.className='msg'+(m.name===myName?' me':'');let b=document.createElement('b');b.textContent=m.name||'Player';let t=document.createElement('div');t.textContent=m.text||'';d.append(b,t);$('chat').appendChild(d)});
+ $('chat').scrollTop=$('chat').scrollHeight;
+}
+async function update(patch){if(!joined)return;await set(ref(db,roomPath),{...state,...patch,updatedAt:Date.now()})}
+$('joinBtn').onclick=async()=>{
+ myName=$('name').value.trim()||'Player';const roomCode=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'');
+ if(!roomCode){alert('Enter a room code and share the same code with her.');return}
+ if(!firebaseConfig.apiKey){alert('Firebase configuration is missing.');return}
+ try{
+ const fb=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+ const authMod=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+ const rt=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
+ const app=fb.initializeApp(firebaseConfig);
+ const auth=authMod.getAuth(app);
+ await authMod.signInAnonymously(auth);
+ db=rt.getDatabase(app);ref=rt.ref;onValue=rt.onValue;set=rt.set;push=rt.push;serverTimestamp=rt.serverTimestamp;
+ roomPath='rooms/'+roomCode;joined=true;
+ onValue(ref(db,roomPath),snap=>{const v=snap.val();state=v?{selected:v.selected||0,answered:v.answered||{},turn:v.turn||1,messages:v.messages||[]}:state;render();});
+ $('game').classList.remove('hidden');$('setupNotice').classList.add('hidden');$('roomInfo').textContent='Connected to room: '+roomCode+' · Share the same link and room code privately.';
+ const snap=await new Promise(resolve=>rt.get(ref(db,roomPath)).then(resolve));
+ if(!snap.exists())await set(ref(db,roomPath),state);
+ }catch(e){alert('Could not connect. Check Firebase config, database URL, and Realtime Database rules. Details: '+e.message)}
+};
+$('passBtn').onclick=()=>update({turn:state.turn===1?2:1});
+$('markBtn').onclick=()=>{if(!state.selected)return;update({answered:{...state.answered,[state.selected]:true},turn:state.turn===1?2:1})};
+$('copyBtn').onclick=async()=>{if(state.selected)try{await navigator.clipboard.writeText('Question '+state.selected+': '+questions[state.selected-1]);alert('Question copied!')}catch{}};
+$('chatForm').addEventListener('submit',async e=>{e.preventDefault();const text=$('message').value.trim();if(!text||!joined)return;const msgs=[...(state.messages||[]),{name:myName,text,at:Date.now()}].slice(-100);$('message').value='';await update({messages:msgs})});
+</script>
+</body></html>
